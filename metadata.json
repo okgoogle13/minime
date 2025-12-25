@@ -1,0 +1,5 @@
+{
+  "name": "Resume Copilot",
+  "description": "An AI-powered application that streamlines the job application process by generating a highly customized, tailored resume for a specific job posting based on a provided template and user's resume.",
+  "requestFramePermissions": []
+}
