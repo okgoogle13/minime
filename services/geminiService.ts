@@ -1,3 +1,4 @@
+
 import type { JobAnalysis, AIResponse, Job, UserProfile } from '../types';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -51,7 +52,7 @@ export const callAnalyzeJobDescriptionFunction = async (jobDescription: string):
   
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -59,12 +60,19 @@ export const callAnalyzeJobDescriptionFunction = async (jobDescription: string):
       }
     });
 
+    if (!response.text) {
+      throw new Error("The AI returned an empty analysis.");
+    }
+
     const jsonText = response.text.trim();
     const result = JSON.parse(jsonText);
     return result as JobAnalysis;
   } catch (error) {
-    console.error("Error analyzing job description:", error);
-    throw new Error("Failed to analyze the job description. The AI model might be unavailable or the content is invalid.");
+    console.error("[GeminiService] Error analyzing job description:", error);
+    if (error instanceof SyntaxError) {
+      throw new Error("The AI returned an invalid data format. Please try again.");
+    }
+    throw new Error("Failed to analyze the job description. The AI service may be temporarily overloaded.");
   }
 };
 
@@ -89,7 +97,7 @@ export const callSearchJobsFunction = async (query: string): Promise<Job[]> => {
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 tools: [{googleSearch: {}}],
@@ -102,8 +110,8 @@ export const callSearchJobsFunction = async (query: string): Promise<Job[]> => {
         const result = JSON.parse(jsonText);
         return result as Job[];
     } catch (error) {
-        console.error("Error searching for jobs:", error);
-        throw new Error("Failed to search for jobs. The AI model or Google Search may be temporarily unavailable.");
+        console.error("[GeminiService] Error searching for jobs:", error);
+        throw new Error("Failed to search for jobs. Google Search integration may be temporarily unavailable.");
     }
 };
 
@@ -113,12 +121,23 @@ const SkillCategorySchema = { type: Type.OBJECT, properties: { category: { type:
 const ExperienceSchema = { type: Type.OBJECT, properties: { jobTitle: { type: Type.STRING }, organization: { type: Type.STRING }, location: { type: Type.STRING }, startDate: { type: Type.STRING }, endDate: { type: Type.STRING }, description: { type: Type.STRING }, responsibilities: { type: Type.ARRAY, items: { type: Type.STRING } }, achievement: { type: Type.STRING } }, required: ['jobTitle', 'organization', 'location', 'startDate', 'endDate', 'description', 'responsibilities', 'achievement'] };
 const CertificationSchema = { type: Type.OBJECT, properties: { name: { type: Type.STRING }, issuingBody: { type: Type.STRING }, date: { type: Type.STRING } }, required: ['name', 'issuingBody', 'date'] };
 const TrainingSchema = { type: Type.OBJECT, properties: { name: { type: Type.STRING }, provider: { type: Type.STRING }, year: { type: Type.STRING } }, required: ['name', 'provider', 'year'] };
-const CertificationsAndDevelopmentSchema = { type: Type.OBJECT, properties: { certifications: { type: Type.ARRAY, items: CertificationSchema }, trainings: { type: Type.ARRAY, items: TrainingSchema } }, required: ['certifications', 'trainings'] };
 const UserProfileSchema = { type: Type.OBJECT, properties: { fullName: { type: Type.STRING }, resumeHeadline: { type: Type.STRING }, phone: { type: Type.STRING }, email: { type: Type.STRING }, location: { type: Type.STRING }, careerSummary: { type: Type.STRING }, education: { type: Type.ARRAY, items: EducationSchema }, skills: { type: Type.ARRAY, items: SkillCategorySchema }, experience: { type: Type.ARRAY, items: ExperienceSchema }, certificationsAndDevelopment: { type: Type.OBJECT, properties: { certifications: { type: Type.ARRAY, items: CertificationSchema }, trainings: { type: Type.ARRAY, items: TrainingSchema } } } }, required: ['fullName', 'resumeHeadline', 'phone', 'email', 'location', 'careerSummary', 'education', 'skills', 'experience', 'certificationsAndDevelopment'] };
 const ScoreBreakdownSchema = { type: Type.OBJECT, properties: { hardSkillsMatch: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, analysis: { type: Type.STRING } }, required: ['score', 'analysis'] }, softSkillsAndVerbsMatch: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, analysis: { type: Type.STRING } }, required: ['score', 'analysis'] }, quantifiableAchievements: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, analysis: { type: Type.STRING } }, required: ['score', 'analysis'] }, atsReadabilityAndFormatting: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, analysis: { type: Type.STRING } }, required: ['score', 'analysis'] } }, required: ['hardSkillsMatch', 'softSkillsAndVerbsMatch', 'quantifiableAchievements', 'atsReadabilityAndFormatting'] };
 const QuantificationSuggestionSchema = { type: Type.OBJECT, properties: { originalText: { type: Type.STRING }, suggestedRewrite: { type: Type.STRING } }, required: ['originalText', 'suggestedRewrite']};
 const EvaluationSchema = { type: Type.OBJECT, properties: { overallScore: { type: Type.INTEGER, description: "A score from 0 to 100." }, overallAnalysis: { type: Type.STRING }, scoreBreakdown: ScoreBreakdownSchema, actionableFeedback: { type: Type.ARRAY, items: { type: Type.STRING } }, quantificationSuggestions: { type: Type.ARRAY, items: QuantificationSuggestionSchema, description: "Suggest improvements for experience descriptions to be more results-oriented. Use brackets like [Managed a team] to highlight changes." } }, required: ['overallScore', 'overallAnalysis', 'scoreBreakdown', 'actionableFeedback'] };
-const AIResponseSchema = { type: Type.OBJECT, properties: { tailoredResume: UserProfileSchema, evaluation: EvaluationSchema }, required: ['tailoredResume', 'evaluation'] };
+const AIResponseSchema = { 
+  type: Type.OBJECT, 
+  properties: { 
+    tailoredResume: UserProfileSchema, 
+    evaluation: EvaluationSchema,
+    headlineSuggestions: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "Generate 3 alternative professional resume headlines. Rules: 1. SHORT: One line max. 2. SPECIFIC: Mention role/focus/achievement. 3. IMPACTFUL: Use total years of experience and top skills from career summary. 4. KEYWORDS: Align with JD if provided."
+    }
+  }, 
+  required: ['tailoredResume', 'evaluation', 'headlineSuggestions'] 
+};
 
 export const callGenerateResumeFunction = async (jobAnalysis: JobAnalysis, userProfile: UserProfile): Promise<AIResponse> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -148,16 +167,25 @@ export const callGenerateResumeFunction = async (jobAnalysis: JobAnalysis, userP
         -   Offer specific, "actionableFeedback" (at least 3 points) on what the user could do to become an even better candidate.
         -   Provide 1-2 "quantificationSuggestions" to improve experience bullet points, highlighting the suggested numerical additions in brackets like "[Increased efficiency by 20%]".
 
+    3.  **Headline Options:**
+        -   Generate 3 highly targeted resume headline options. 
+        -   HEADLINE BEST PRACTICES:
+            -   KEEP IT SHORT: Aim for one line.
+            -   BE SPECIFIC: Calculate the total years of experience from the work history. Use terms from the Career Summary.
+            -   USE KEYWORDS: Include job titles and skills from the JD to improve ATS visibility.
+            -   Example: "Senior Cloud Architect | 12+ Years Exp | AWS & Kubernetes Specialist"
+
     Your final output MUST be a single, valid JSON object that strictly adheres to the provided schema. Do not include any text or formatting outside of the JSON object.
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: AIResponseSchema,
+        thinkingConfig: { thinkingBudget: 32768 }
       }
     });
     
@@ -165,9 +193,60 @@ export const callGenerateResumeFunction = async (jobAnalysis: JobAnalysis, userP
     const result = JSON.parse(jsonText);
     return result as AIResponse;
   } catch (error) {
-    console.error("Error generating resume:", error);
-    throw new Error("Failed to generate the resume. The AI model may be overloaded or returned an unexpected response.");
+    console.error("[GeminiService] Error generating resume:", error);
+    throw new Error("The AI reasoning engine failed to complete the task. This can happen with very complex profiles; please try again.");
   }
+};
+
+/**
+ * Generates 3 professional headline suggestions for a user profile.
+ * Incorporates years of experience, career summary, and job description keywords if available.
+ */
+export const callGenerateProfileHeadlines = async (userProfile: UserProfile, jobAnalysis?: JobAnalysis | null): Promise<string[]> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const contextStr = jobAnalysis 
+        ? `Targeting the role: ${jobAnalysis.jobTitle} at ${jobAnalysis.companyName}. Relevant keywords: ${jobAnalysis.keywords.join(', ')}.`
+        : "General professional profile setup.";
+
+    const prompt = `
+        As a career expert, generate 3 professional resume headlines for this candidate.
+        
+        CANDIDATE DATA:
+        Summary: ${userProfile.careerSummary}
+        Work History: ${JSON.stringify(userProfile.experience.map(e => ({ title: e.jobTitle, dates: `${e.startDate} - ${e.endDate}` })))}
+        
+        CONTEXT:
+        ${contextStr}
+        
+        HEADLINE BEST PRACTICES:
+        1. SHORT: One line, concise.
+        2. SPECIFIC: Mention the candidate's core role and top expertise.
+        3. IMPACTFUL: Calculate total years of experience from the work history. Mention it if significant (e.g., "8+ Years").
+        4. KEYWORDS: If target keywords are provided above, weave them in naturally.
+        
+        Return exactly 3 strings in a JSON array.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                }
+            }
+        });
+        
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText) as string[];
+    } catch (error) {
+        console.error("[GeminiService] Error generating profile headlines:", error);
+        throw new Error("Unable to generate headlines at this moment.");
+    }
 };
 
 
@@ -218,6 +297,11 @@ export const MOCK_USER_PROFILE: UserProfile = {
 
 export const MOCK_AI_RESPONSE: AIResponse = {
   tailoredResume: MOCK_USER_PROFILE,
+  headlineSuggestions: [
+    "Project Manager with 5+ Years Experience in Agile Delivery",
+    "Full-Stack Developer Specializing in React & Node.js Architecture",
+    "Results-Driven Tech Lead Proven in Delivering Enterprise Solutions"
+  ],
   evaluation: {
     overallScore: 88,
     overallAnalysis: "A strong candidate with highly relevant technical and project management skills.",

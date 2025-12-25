@@ -1,3 +1,4 @@
+
 // Fix: Added full content for types.ts to define shared interfaces.
 export interface JobAnalysis {
   jobTitle: string;
@@ -107,4 +108,5 @@ export interface Evaluation {
 export interface AIResponse {
   tailoredResume: UserProfile;
   evaluation: Evaluation;
+  headlineSuggestions: string[];
 }

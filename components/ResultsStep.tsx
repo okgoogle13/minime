@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AIResponse, ScoreBreakdown, QuantificationSuggestion, UserProfile } from '../types';
 import ResumePreview, { type Theme } from './ResumePreview';
 import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
@@ -53,6 +53,7 @@ interface ResultsStepProps {
   response: AIResponse;
   onStartOver: () => void;
   initialTheme: Theme;
+  setError: (msg: string | null) => void;
 }
 
 interface ScoreCardProps {
@@ -120,18 +121,28 @@ const themeOptions = [
   { id: 'vibrant', name: 'Vibrant', previewClass: 'bg-pink-500' },
 ];
 
-const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initialTheme }) => {
+const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initialTheme, setError }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [theme, setTheme] = useState<Theme>(initialTheme);
-  const { evaluation, tailoredResume } = response;
+  const [activeResume, setActiveResume] = useState<UserProfile>(response.tailoredResume);
+
+  const { evaluation, headlineSuggestions } = response;
   const overallScore = evaluation.overallScore;
   const scoreBreakdown: ScoreBreakdown = evaluation.scoreBreakdown;
   const circumference = 2 * Math.PI * 52; // For the SVG gauge
 
+  useEffect(() => {
+    setActiveResume(response.tailoredResume);
+  }, [response]);
+
   const handleDownloadPdf = async () => {
     const resumeElement = document.getElementById('resume-preview');
-    if (!resumeElement) return;
+    if (!resumeElement) {
+        setError("Resume preview could not be found for PDF generation.");
+        return;
+    }
+    setError(null);
     setIsGeneratingPdf(true);
     try {
       const canvas = await html2canvas(resumeElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
@@ -140,22 +151,28 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${tailoredResume.fullName.replace(' ', '_')}_Resume.pdf`);
+      pdf.save(`${activeResume.fullName.replace(' ', '_')}_Resume.pdf`);
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('[ResultsStep] PDF generation error:', error);
+      setError("Failed to generate PDF. Your browser might be blocking the download or the document is too large.");
     } finally {
       setIsGeneratingPdf(false);
     }
   };
 
   const handleCopyToClipboard = () => {
-    const textToCopy = resumeToText(tailoredResume);
+    const textToCopy = resumeToText(activeResume);
     navigator.clipboard.writeText(textToCopy).then(() => {
       setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2500); // Reset after 2.5 seconds
+      setTimeout(() => setIsCopied(false), 2500); 
     }, (err) => {
-      console.error('Could not copy text: ', err);
+      console.error('[ResultsStep] Copy to clipboard failed:', err);
+      setError("Failed to copy text. Please try selecting the text manually.");
     });
+  };
+
+  const swapHeadline = (newHeadline: string) => {
+    setActiveResume(prev => ({ ...prev, resumeHeadline: newHeadline }));
   };
   
   const atsExplanation = (
@@ -164,7 +181,6 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
           <p>
               Applicant Tracking Systems (ATS) are automated bots that scan your resume before a human sees it.
               This score reflects how easily the ATS can parse your resume's layout, headings, and keywords.
-              A higher score means your resume is well-structured, uses standard formatting, and is less likely to be rejected due to technical errors.
           </p>
       </>
   );
@@ -189,7 +205,7 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         <div className="lg:col-span-1 space-y-6">
-          <div className="card p-6 sticky top-8">
+          <div className="card p-6 sticky top-8 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4" style={{ color: 'var(--on-surface-color)' }}>Resume Analysis</h3>
             
             <div className="text-center p-6 rounded-lg" style={{backgroundColor: 'var(--surface-bright-color)'}}>
@@ -211,6 +227,27 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
                 </div>
                 <p className="text-sm" style={{ color: 'var(--on-surface-variant-color)' }}>{evaluation.overallAnalysis}</p>
                  {overallScore < 75 && <p className="text-xs font-semibold mt-2" style={{ color: 'var(--error-color)'}}>Recommended score is 75% or higher.</p>}
+            </div>
+
+            <div className="mt-6">
+                <h4 className="font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--on-surface-variant-color)' }}>
+                    <SparklesIcon className="w-5 h-5" style={{ color: 'var(--primary-color)'}} />
+                    Alternative Headlines
+                </h4>
+                <div className="space-y-2">
+                    {headlineSuggestions.map((headline, idx) => (
+                        <button 
+                            key={idx}
+                            onClick={() => swapHeadline(headline)}
+                            className={`w-full text-left p-3 rounded-lg text-sm border transition-all ${activeResume.resumeHeadline === headline ? 'border-purple-500 bg-purple-500/10' : 'border-outline-color hover:border-purple-500/50 bg-surface-bright-color'}`}
+                        >
+                            {headline}
+                        </button>
+                    ))}
+                    <p className="text-[10px] italic mt-1" style={{ color: 'var(--on-surface-variant-color)' }}>
+                        Click a headline to swap it in the preview.
+                    </p>
+                </div>
             </div>
             
             <div className="mt-6 space-y-4">
@@ -288,7 +325,7 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
                 ))}
               </div>
             </div>
-            <ResumePreview resumeData={tailoredResume} theme={theme} />
+            <ResumePreview resumeData={activeResume} theme={theme} />
         </div>
       </div>
     </div>

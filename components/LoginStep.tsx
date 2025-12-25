@@ -1,29 +1,26 @@
 
-
 import React, { useState } from 'react';
-// Fix: Use Firebase v8 namespaced API for authentication to resolve import errors.
-// Fix: Update imports to use the v9 compat library for v8 syntax support.
-// Fix: Corrected firebase import to use compat library for v8 namespaced API.
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import { auth } from '../firebaseConfig';
 
-const LoginStep: React.FC = () => {
+interface LoginStepProps {
+    setError: (msg: string | null) => void;
+}
+
+const LoginStep: React.FC<LoginStepProps> = ({ setError }) => {
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
     const handleSignIn = async () => {
         setIsLoading(true);
         setError(null);
-        // Fix: Use v8 GoogleAuthProvider.
         const provider = new firebase.auth.GoogleAuthProvider();
         try {
-            // Fix: Use v8 signInWithPopup method.
             await auth.signInWithPopup(provider);
-            // onAuthStateChanged in App.tsx will handle navigation
         } catch (err) {
+            console.error("[LoginStep] Sign-in error:", err);
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred during sign-in.';
-            setError(errorMessage);
+            setError("Sign-in failed. Please ensure you are using a valid Google account.");
             setIsLoading(false);
         }
     };
@@ -39,22 +36,27 @@ const LoginStep: React.FC = () => {
     );
 
     return (
-        <div className="max-w-md mx-auto text-center py-16 fade-in">
-            <h2 className="text-3xl font-bold mb-2" style={{color: 'var(--on-surface-color)'}}>Welcome to AI Resume Tailor</h2>
-            <p className="mb-8" style={{color: 'var(--on-surface-variant-color)'}}>
-                Please sign in to continue. We use your account to securely save and manage your resumes.
+        <div className="max-w-md mx-auto text-center py-24 fade-in">
+            <div className="mb-8 flex justify-center">
+                <div className="p-4 rounded-full bg-purple-500/10 border border-purple-500/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                </div>
+            </div>
+            <h2 className="text-4xl font-black mb-4" style={{color: 'var(--on-surface-color)'}}>Welcome to Resume Copilot</h2>
+            <p className="text-lg mb-10" style={{color: 'var(--on-surface-variant-color)'}}>
+                Securely build, tailor, and manage your resumes with the power of AI. Sign in to start your journey.
             </p>
             
             <button
                 onClick={handleSignIn}
                 disabled={isLoading}
-                className="btn btn-filled w-full sm:w-auto"
+                className="btn btn-filled w-full h-14"
             >
                 <GoogleIcon />
-                {isLoading ? 'Signing In...' : 'Sign In with Google'}
+                {isLoading ? 'Authenticating...' : 'Sign In with Google'}
             </button>
-            
-            {error && <p className="text-sm mt-4" style={{color: 'var(--error-color)'}}>{error}</p>}
         </div>
     );
 };

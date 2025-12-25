@@ -48,7 +48,7 @@ const App: React.FC = () => {
             setStep('PROFILE_SETUP');
           }
         } catch (e) {
-          setError("Could not load your profile. Please try refreshing the page.");
+          setError(e instanceof Error ? e.message : "Could not load your profile. Please try refreshing the page.");
         } finally {
           setIsProfileLoading(false);
         }
@@ -67,9 +67,9 @@ const App: React.FC = () => {
       }
       setError(null);
       setUserProfile(profile);
-      setStep('JOB_SEARCH');
       try {
           await saveUserProfile(user.uid, profile);
+          setStep('JOB_SEARCH');
       } catch(err) {
           setError(err instanceof Error ? err.message : 'An unknown error occurred while saving.');
           setStep('PROFILE_SETUP');
@@ -92,32 +92,38 @@ const App: React.FC = () => {
   }, []);
 
   const handleJobSelection = useCallback(async (jobDescription: string) => {
+    setError(null);
     if (!jobDescription) {
       setStep('JOB_INPUT');
       return;
     }
     setStep('ANALYZING_JOB');
-    setError(null);
     try {
       const analysis = await callAnalyzeJobDescriptionFunction(jobDescription);
       setJobAnalysis(analysis);
       setStep('JOB_VERIFICATION');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      setError(err instanceof Error ? err.message : 'An unknown error occurred during analysis.');
       setStep('JOB_SEARCH');
     }
   }, []);
 
-  const handleJobVerificationNext = () => setStep('TEMPLATE_SELECTION');
+  const handleJobVerificationNext = () => {
+      setError(null);
+      setStep('TEMPLATE_SELECTION');
+  };
+  
   const handleJobAnalysisUpdate = (updatedAnalysis: JobAnalysis) => setJobAnalysis(updatedAnalysis);
+  
   const handleTemplateSelectionNext = (template: Theme) => {
+    setError(null);
     setSelectedTemplate(template);
     setStep('FINAL_VERIFICATION');
   };
 
   const handleVerificationConfirm = useCallback(async () => {
     if (!jobAnalysis || !userProfile) {
-        setError("Missing job analysis or profile.");
+        setError("Missing job analysis or profile context.");
         setStep('JOB_SEARCH');
         return;
     }
@@ -128,7 +134,7 @@ const App: React.FC = () => {
       setAiResponse(response);
       setStep('RESULTS');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      setError(err instanceof Error ? err.message : 'An unknown error occurred during generation.');
       setStep('FINAL_VERIFICATION');
     }
   }, [jobAnalysis, userProfile]);
@@ -148,14 +154,19 @@ const App: React.FC = () => {
     try {
       await auth.signOut();
     } catch (error) {
-      setError("Failed to sign out.");
+      setError("Failed to sign out. Please try again.");
     }
   };
 
   const ErrorAlert: React.FC<{ message: string }> = ({ message }) => (
-    <div className="max-w-4xl mx-auto -mb-4 p-4 rounded-lg" style={{ backgroundColor: 'rgba(207, 102, 121, 0.2)', border: '1px solid var(--error-color)' }} role="alert">
-      <strong className="font-bold" style={{ color: 'var(--error-color)'}}>Error: </strong>
-      <span className="block sm:inline" style={{ color: 'var(--on-surface-color)'}}>{message}</span>
+    <div className="max-w-4xl mx-auto mb-6 p-4 rounded-lg flex items-center justify-between" style={{ backgroundColor: 'rgba(207, 102, 121, 0.15)', border: '1px solid var(--error-color)' }} role="alert">
+      <div className="flex items-center gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" style={{color: 'var(--error-color)'}}>
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+        </svg>
+        <span className="text-sm font-medium" style={{ color: 'var(--on-surface-color)'}}>{message}</span>
+      </div>
+      <button onClick={() => setError(null)} className="text-xs uppercase font-bold tracking-widest opacity-70 hover:opacity-100 transition-opacity" style={{ color: 'var(--on-surface-color)'}}>Dismiss</button>
     </div>
   );
   
@@ -167,37 +178,28 @@ const App: React.FC = () => {
   );
 
   const renderStep = () => {
-    if (isProfileLoading) return <LoadingScreen message="Loading your profile..." />;
-    if (!user) return <LoginStep />;
+    if (isProfileLoading) return <LoadingScreen message="Accessing your career data..." />;
+    if (!user) return <LoginStep setError={setError} />;
+    
     switch (step) {
-      case 'LOGIN': return <LoadingScreen message="Authenticating..." />;
-      case 'PROFILE_SETUP': return <ProfileSetupStep onSave={handleProfileSave} initialProfile={userProfile} user={user} />;
+      case 'LOGIN': return <LoadingScreen message="Finalizing authentication..." />;
+      case 'PROFILE_SETUP': return <ProfileSetupStep onSave={handleProfileSave} initialProfile={userProfile} user={user} jobAnalysis={jobAnalysis} setError={setError} />;
       case 'JOB_SEARCH':
-        return (
-          <>
-            {error && <ErrorAlert message={error} />}
-            <JobSearchStep onSearch={handleJobSearch} onSelect={handleJobSelection} isSearching={isSearching} results={searchResults} />
-          </>
-        );
+        return <JobSearchStep onSearch={handleJobSearch} onSelect={handleJobSelection} isSearching={isSearching} results={searchResults} />;
       case 'JOB_INPUT':
         return <JobInputStep jobDescription="" onNext={handleJobSelection} />;
       case 'ANALYZING_JOB': return <AnalyzingStep />;
       case 'JOB_VERIFICATION':
-        return <JobVerificationStep analysis={jobAnalysis} onNext={handleJobVerificationNext} onBack={() => setStep('JOB_SEARCH')} onUpdate={handleJobAnalysisUpdate} />;
+        return <JobVerificationStep analysis={jobAnalysis} onNext={handleJobVerificationNext} onBack={() => { setError(null); setStep('JOB_SEARCH'); }} onUpdate={handleJobAnalysisUpdate} />;
       case 'TEMPLATE_SELECTION':
-        return <TemplateSelectionStep onNext={handleTemplateSelectionNext} onBack={() => setStep('JOB_VERIFICATION')} initialTemplate={selectedTemplate} />;
+        return <TemplateSelectionStep onNext={handleTemplateSelectionNext} onBack={() => { setError(null); setStep('JOB_VERIFICATION'); }} initialTemplate={selectedTemplate} />;
       case 'FINAL_VERIFICATION':
-        return (
-          <>
-            {error && <ErrorAlert message={error} />}
-            <VerificationStep jobTitle={jobAnalysis?.jobTitle || 'the selected job'} onConfirm={handleVerificationConfirm} onBack={() => setStep('TEMPLATE_SELECTION')} />
-          </>
-        );
+        return <VerificationStep jobTitle={jobAnalysis?.jobTitle || 'the selected job'} onConfirm={handleVerificationConfirm} onBack={() => { setError(null); setStep('TEMPLATE_SELECTION'); }} />;
       case 'GENERATION': return <GenerationStep />;
       case 'RESULTS':
-        if (!aiResponse) return <div>Error: No response data. <button onClick={() => handleStartOver()}>Start Over</button></div>
-        return <ResultsStep response={aiResponse} onStartOver={() => handleStartOver()} initialTheme={selectedTemplate} />;
-      default: return <LoginStep />;
+        if (!aiResponse) return <div className="text-center py-12">Error: No tailored resume data found. <button onClick={() => handleStartOver()} className="btn btn-filled mt-4">Return Home</button></div>
+        return <ResultsStep response={aiResponse} onStartOver={() => handleStartOver()} initialTheme={selectedTemplate} setError={setError} />;
+      default: return <LoginStep setError={setError} />;
     }
   };
 
@@ -205,21 +207,31 @@ const App: React.FC = () => {
     <div className="min-h-screen">
       <header style={{ backgroundColor: 'var(--surface-color)', borderBottom: '1px solid var(--outline-color)'}}>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-           <h1 className="text-2xl font-bold" style={{ color: 'var(--on-surface-color)'}}>AI Resume Tailor</h1>
+           <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleStartOver()}>
+              <SparklesIcon className="w-8 h-8" style={{color: 'var(--primary-color)'}} />
+              <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--on-surface-color)'}}>Resume Copilot</h1>
+           </div>
            {user && (
               <div className="flex items-center gap-4">
-                 <span className="text-sm hidden sm:inline" style={{ color: 'var(--on-surface-variant-color)'}}>Welcome, {user.displayName || user.email}</span>
-                  {step !== 'PROFILE_SETUP' && <button onClick={() => setStep('PROFILE_SETUP')} className="text-sm font-medium" style={{color: 'var(--primary-color)'}}>Edit Profile</button>}
-                 <button onClick={handleSignOut} className="text-sm font-medium" style={{color: 'var(--primary-color)'}}>Sign Out</button>
+                 <span className="text-sm hidden sm:inline" style={{ color: 'var(--on-surface-variant-color)'}}>Hello, {user.displayName || user.email?.split('@')[0]}</span>
+                  {step !== 'PROFILE_SETUP' && (
+                    <button onClick={() => { setError(null); setStep('PROFILE_SETUP'); }} className="text-sm font-bold uppercase tracking-widest hover:opacity-80 transition-opacity" style={{color: 'var(--primary-color)'}}>
+                      Profile
+                    </button>
+                  )}
+                 <button onClick={handleSignOut} className="text-sm font-bold uppercase tracking-widest hover:opacity-80 transition-opacity" style={{color: 'var(--primary-color)'}}>
+                   Sign Out
+                 </button>
               </div>
             )}
         </div>
       </header>
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error && <ErrorAlert message={error} />}
         {renderStep()}
       </main>
-      <footer className="text-center py-4">
-        <p className="text-sm" style={{color: 'var(--on-surface-variant-color)'}}>&copy; {new Date().getFullYear()} AI Resume Tailor. All rights reserved.</p>
+      <footer className="text-center py-8 border-t border-white/5">
+        <p className="text-xs uppercase tracking-widest font-bold" style={{color: 'var(--on-surface-variant-color)'}}>&copy; {new Date().getFullYear()} Resume Copilot &bull; Powered by Gemini 3 Pro</p>
       </footer>
     </div>
   );
