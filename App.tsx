@@ -34,30 +34,28 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        setIsProfileLoading(true);
-        setError(null);
-        try {
-          const profile = await getUserProfile(currentUser.uid);
-          setUserProfile(profile);
-          if (profile) {
-            setStep(prev => prev === 'LOGIN' || prev === 'PROFILE_SETUP' ? 'JOB_SEARCH' : prev);
-          } else {
-            setStep('PROFILE_SETUP');
-          }
-        } catch (e) {
-          setError(e instanceof Error ? e.message : "Could not load your profile. Please try refreshing the page.");
-        } finally {
-          setIsProfileLoading(false);
+    // Bypass auth for testing
+    const mockUser = { uid: 'test-user', displayName: 'Test User', email: 'test@example.com' } as firebase.User;
+    setUser(mockUser);
+    setIsProfileLoading(true);
+    
+    const loadProfile = async () => {
+      try {
+        const profile = await getUserProfile(mockUser.uid);
+        setUserProfile(profile);
+        if (profile) {
+          setStep('JOB_SEARCH');
+        } else {
+          setStep('PROFILE_SETUP');
         }
-      } else {
-        handleStartOver(true);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not load your profile.");
+      } finally {
         setIsProfileLoading(false);
       }
-    });
-    return () => unsubscribe();
+    };
+    
+    loadProfile();
   }, []);
   
   const handleProfileSave = useCallback(async (profile: UserProfile) => {
@@ -152,7 +150,8 @@ const App: React.FC = () => {
   
   const handleSignOut = async () => {
     try {
-      await auth.signOut();
+      localStorage.removeItem('resume_copilot_profile');
+      window.location.reload();
     } catch (error) {
       setError("Failed to sign out. Please try again.");
     }
