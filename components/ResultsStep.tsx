@@ -7,10 +7,7 @@ import { SparklesIcon } from './icons/SparklesIcon';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { CheckIcon } from './icons/CheckIcon';
-
-// Declare globals for libraries loaded via CDN
-declare const html2canvas: any;
-declare const jspdf: any;
+import { DocumentTextIcon } from './icons/DocumentTextIcon';
 
 const resumeToText = (resumeData: UserProfile): string => {
     let text = `${resumeData.fullName}\n`;
@@ -122,7 +119,6 @@ const themeOptions = [
 ];
 
 const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initialTheme, setError }) => {
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [documentType, setDocumentType] = useState<DocumentType>('resume');
@@ -137,29 +133,60 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
     setActiveResume(response.tailoredResume);
   }, [response]);
 
-  const handleDownloadPdf = async () => {
-    const resumeElement = document.getElementById('resume-preview');
-    if (!resumeElement) {
-        setError("Document preview could not be found for PDF generation.");
+  const handleDownloadPdf = () => {
+    window.print();
+  };
+
+  const handleDownloadWord = () => {
+    const element = document.getElementById('resume-preview');
+    if (!element) {
+        setError("Document preview could not be found for Word generation.");
         return;
     }
-    setError(null);
-    setIsGeneratingPdf(true);
-    try {
-      const canvas = await html2canvas(resumeElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      const fileName = documentType === 'resume' ? 'Resume' : documentType === 'coverLetter' ? 'Cover_Letter' : 'KSC_Responses';
-      pdf.save(`${activeResume.fullName.replace(' ', '_')}_${fileName}.pdf`);
-    } catch (error) {
-      console.error('[ResultsStep] PDF generation error:', error);
-      setError("Failed to generate PDF. Your browser might be blocking the download or the document is too large.");
-    } finally {
-      setIsGeneratingPdf(false);
-    }
+    
+    // Clone the element to get its HTML
+    const clone = element.cloneNode(true) as HTMLElement;
+    const htmlContent = clone.innerHTML;
+
+    // Create a complete HTML document with Word-specific XML namespaces
+    const htmlDocument = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset='utf-8'>
+        <title>Exported Document</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          h1 { font-size: 24pt; font-weight: bold; margin-bottom: 12pt; }
+          h2 { font-size: 18pt; font-weight: bold; margin-top: 18pt; margin-bottom: 8pt; border-bottom: 1px solid #ccc; }
+          h3 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 4pt; }
+          p { margin-bottom: 8pt; }
+          ul { margin-bottom: 12pt; }
+          li { margin-bottom: 4pt; }
+          .font-serif { font-family: "Times New Roman", serif; }
+          .font-sans { font-family: Arial, sans-serif; }
+          .text-center { text-align: center; }
+          .font-bold { font-weight: bold; }
+          .italic { font-style: italic; }
+        </style>
+      </head>
+      <body>
+        ${htmlContent}
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff', htmlDocument], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const fileName = documentType === 'resume' ? 'Resume' : documentType === 'coverLetter' ? 'Cover_Letter' : 'KSC_Responses';
+    link.download = `${activeResume.fullName.replace(' ', '_')}_${fileName}.doc`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleCopyToClipboard = () => {
@@ -293,9 +320,13 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
           </div>
           
           <div className="flex flex-col gap-4">
-            <button onClick={handleDownloadPdf} disabled={isGeneratingPdf} className="btn btn-filled w-full">
+            <button onClick={handleDownloadPdf} className="btn btn-filled w-full">
               <ArrowDownTrayIcon />
-              {isGeneratingPdf ? 'Generating PDF...' : 'Download as PDF'}
+              Save as PDF
+            </button>
+            <button onClick={handleDownloadWord} className="btn btn-filled w-full" style={{ backgroundColor: '#2b579a', color: 'white' }}>
+              <DocumentTextIcon />
+              Download Word (.doc)
             </button>
             <div className="grid grid-cols-2 gap-4">
                 <button 

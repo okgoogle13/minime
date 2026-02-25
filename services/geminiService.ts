@@ -1,6 +1,6 @@
 
 import type { JobAnalysis, AIResponse, Job, UserProfile } from '../types';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 
 const JobAnalysisSchema = {
   type: Type.OBJECT,
@@ -206,12 +206,12 @@ export const callGenerateResumeFunction = async (jobAnalysis: JobAnalysis, userP
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: AIResponseSchema,
-        thinkingConfig: { thinkingBudget: 32768 }
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH }
       }
     });
     
