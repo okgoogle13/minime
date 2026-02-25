@@ -1,12 +1,14 @@
-
 import React from 'react';
 import type { UserProfile } from '../types';
 
 interface SidebarTemplateProps {
   resumeData: UserProfile;
+  documentType?: 'resume' | 'coverLetter' | 'ksc';
+  coverLetter?: string;
+  kscResponses?: { criteria: string; response: string }[];
 }
 
-const SidebarTemplate: React.FC<SidebarTemplateProps> = ({ resumeData }) => {
+const SidebarTemplate: React.FC<SidebarTemplateProps> = ({ resumeData, documentType = 'resume', coverLetter, kscResponses }) => {
   const {
     fullName,
     resumeHeadline,
@@ -25,6 +27,90 @@ const SidebarTemplate: React.FC<SidebarTemplateProps> = ({ resumeData }) => {
       {children}
     </h2>
   );
+
+  const renderMainContent = () => {
+    switch (documentType) {
+      case 'coverLetter':
+        return (
+          <section className="fade-in">
+            <SectionTitle>Cover Letter</SectionTitle>
+            <div className="text-slate-600 whitespace-pre-wrap leading-relaxed">
+              {coverLetter || "No cover letter content generated."}
+            </div>
+          </section>
+        );
+      case 'ksc':
+        return (
+          <section className="fade-in space-y-8">
+            <SectionTitle>Key Selection Criteria Responses</SectionTitle>
+            {kscResponses && kscResponses.length > 0 ? (
+              kscResponses.map((ksc, idx) => (
+                <div key={idx} className="space-y-3">
+                  <h3 className="text-base font-bold text-slate-900">{ksc.criteria}</h3>
+                  <div className="text-slate-600 leading-relaxed">{ksc.response}</div>
+                </div>
+              ))
+            ) : (
+              <p className="text-slate-600">No KSC responses generated.</p>
+            )}
+          </section>
+        );
+      default:
+        return (
+          <div className="space-y-8 fade-in">
+            <section>
+              <SectionTitle>Profile Summary</SectionTitle>
+              <p className="text-slate-600 italic leading-relaxed">{careerSummary}</p>
+            </section>
+
+            <section>
+              <SectionTitle>Experience</SectionTitle>
+              <div className="space-y-6">
+                {experience.map((job, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between items-baseline">
+                      <h3 className="text-base font-bold text-slate-900">{job.jobTitle}</h3>
+                      <span className="text-xs font-bold text-slate-400">{job.startDate} — {job.endDate}</span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">{job.organization} | {job.location}</p>
+                    <ul className="list-disc list-outside ml-4 space-y-1.5 text-slate-600 text-[13px]">
+                      {job.responsibilities.map((res, ri) => (
+                        <li key={ri}>{res}</li>
+                      ))}
+                    </ul>
+                    {job.achievement && (
+                      <div className="mt-2 pl-3 border-l-2 border-slate-200">
+                        <p className="text-[13px] text-slate-700 font-semibold"><span className="text-slate-400 mr-1">Achievement:</span> {job.achievement}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {(certificationsAndDevelopment.certifications.length > 0 || certificationsAndDevelopment.trainings.length > 0) && (
+              <section>
+                <SectionTitle>Certifications & Training</SectionTitle>
+                <ul className="grid grid-cols-1 gap-2 text-slate-600 text-xs">
+                  {certificationsAndDevelopment.certifications.map((c, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="font-bold text-slate-800">• {c.name}</span>
+                      <span className="text-slate-400">({c.issuingBody}, {c.date})</span>
+                    </li>
+                  ))}
+                  {certificationsAndDevelopment.trainings.map((t, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="font-bold text-slate-800">• {t.name}</span>
+                      <span className="text-slate-400">({t.provider}, {t.year})</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="flex bg-white min-h-[1000px] font-sans text-sm leading-relaxed text-slate-800">
@@ -85,55 +171,7 @@ const SidebarTemplate: React.FC<SidebarTemplateProps> = ({ resumeData }) => {
 
       {/* Main Content - 2/3 width */}
       <main className="w-2/3 p-10 flex flex-col gap-8 bg-white">
-        <section>
-          <SectionTitle>Profile Summary</SectionTitle>
-          <p className="text-slate-600 italic leading-relaxed">{careerSummary}</p>
-        </section>
-
-        <section>
-          <SectionTitle>Experience</SectionTitle>
-          <div className="space-y-6">
-            {experience.map((job, i) => (
-              <div key={i}>
-                <div className="flex justify-between items-baseline">
-                  <h3 className="text-base font-bold text-slate-900">{job.jobTitle}</h3>
-                  <span className="text-xs font-bold text-slate-400">{job.startDate} — {job.endDate}</span>
-                </div>
-                <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">{job.organization} | {job.location}</p>
-                <ul className="list-disc list-outside ml-4 space-y-1.5 text-slate-600 text-[13px]">
-                  {job.responsibilities.map((res, ri) => (
-                    <li key={ri}>{res}</li>
-                  ))}
-                </ul>
-                {job.achievement && (
-                  <div className="mt-2 pl-3 border-l-2 border-slate-200">
-                    <p className="text-[13px] text-slate-700 font-semibold"><span className="text-slate-400 mr-1">Achievement:</span> {job.achievement}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {(certificationsAndDevelopment.certifications.length > 0 || certificationsAndDevelopment.trainings.length > 0) && (
-          <section>
-            <SectionTitle>Certifications & Training</SectionTitle>
-            <ul className="grid grid-cols-1 gap-2 text-slate-600 text-xs">
-              {certificationsAndDevelopment.certifications.map((c, i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="font-bold text-slate-800">• {c.name}</span>
-                  <span className="text-slate-400">({c.issuingBody}, {c.date})</span>
-                </li>
-              ))}
-              {certificationsAndDevelopment.trainings.map((t, i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="font-bold text-slate-800">• {t.name}</span>
-                  <span className="text-slate-400">({t.provider}, {t.year})</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        {renderMainContent()}
       </main>
     </div>
   );

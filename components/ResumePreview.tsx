@@ -5,10 +5,14 @@ import StructuredTemplate from './StructuredTemplate';
 import SidebarTemplate from './SidebarTemplate';
 
 export type Theme = 'modern' | 'classic' | 'creative' | 'metropolis' | 'chronicle' | 'matrix' | 'executive' | 'structured' | 'quantum' | 'garamond' | 'vibrant' | 'sidebar';
+export type DocumentType = 'resume' | 'coverLetter' | 'ksc';
 
 interface ResumePreviewProps {
   resumeData: UserProfile;
   theme: Theme;
+  documentType?: DocumentType;
+  coverLetter?: string;
+  kscResponses?: { criteria: string; response: string }[];
 }
 
 const themes = {
@@ -230,11 +234,11 @@ const themes = {
   }
 };
 
-const ResumePreview: React.FC<ResumePreviewProps> = ({ resumeData, theme }) => {
+const ResumePreview: React.FC<ResumePreviewProps> = ({ resumeData, theme, documentType = 'resume', coverLetter, kscResponses }) => {
   if (theme === 'structured') {
     return (
       <div id="resume-preview" className="bg-white shadow-xl rounded-lg overflow-hidden">
-        <StructuredTemplate resumeData={resumeData} />
+        <StructuredTemplate resumeData={resumeData} documentType={documentType} coverLetter={coverLetter} kscResponses={kscResponses} />
       </div>
     );
   }
@@ -242,7 +246,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ resumeData, theme }) => {
   if (theme === 'sidebar') {
     return (
       <div id="resume-preview" className="bg-white shadow-xl rounded-lg overflow-hidden">
-        <SidebarTemplate resumeData={resumeData} />
+        <SidebarTemplate resumeData={resumeData} documentType={documentType} coverLetter={coverLetter} kscResponses={kscResponses} />
       </div>
     );
   }
@@ -267,97 +271,132 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ resumeData, theme }) => {
     </div>
   );
 
+  const renderContent = () => {
+    switch (documentType) {
+      case 'coverLetter':
+        return (
+          <section className="fade-in">
+            <h2 className={`${currentTheme.sectionTitle} pb-2 mb-6`}>Cover Letter</h2>
+            <div className={`${currentTheme.bodyText} whitespace-pre-wrap leading-relaxed`}>
+              {coverLetter || "No cover letter content generated."}
+            </div>
+          </section>
+        );
+      case 'ksc':
+        return (
+          <section className="fade-in space-y-8">
+            <h2 className={`${currentTheme.sectionTitle} pb-2 mb-6`}>Key Selection Criteria Responses</h2>
+            {kscResponses && kscResponses.length > 0 ? (
+              kscResponses.map((ksc, idx) => (
+                <div key={idx} className="space-y-3">
+                  <h3 className={`text-lg font-bold ${currentTheme.highlight}`}>{ksc.criteria}</h3>
+                  <div className={`${currentTheme.bodyText} leading-relaxed`}>{ksc.response}</div>
+                </div>
+              ))
+            ) : (
+              <p className={currentTheme.bodyText}>No KSC responses generated.</p>
+            )}
+          </section>
+        );
+      default:
+        return (
+          <div className="space-y-8 fade-in">
+            <hr/>
+            <section>
+              <h2 className={`${currentTheme.sectionTitle} pb-2 mb-4`}>Professional Summary</h2>
+              <p className={currentTheme.bodyText}>{careerSummary}</p>
+            </section>
+
+            <section>
+              <h2 className={`${currentTheme.sectionTitle} pb-2 mb-4`}>Education</h2>
+              <div className="space-y-3">
+                {education.map((edu, index) => (
+                  <div key={index}>
+                    <p className={`font-bold ${currentTheme.bodyText}`}>{edu.degree}</p>
+                    <p className={currentTheme.jobMeta}>{edu.institution} | {edu.location} | {edu.graduationYear}</p>
+                  </div>
+                ))}
+              </div>
+                { (certificationsAndDevelopment.certifications.length > 0 || certificationsAndDevelopment.trainings.length > 0) &&
+                    <div className="mt-4">
+                        <h3 className={`font-semibold text-sm ${currentTheme.highlight}`}>Certifications & Development</h3>
+                        <ul className={`list-disc list-inside space-y-1 mt-2 text-sm ${currentTheme.bodyText}`}>
+                            {certificationsAndDevelopment.certifications.map((cert, index) => (
+                                <li key={`cert-${index}`}>{cert.name}, {cert.issuingBody} ({cert.date})</li>
+                            ))}
+                            {certificationsAndDevelopment.trainings.map((train, index) => (
+                                <li key={`train-${index}`}>{train.name}, {train.provider} ({train.year})</li>
+                            ))}
+                        </ul>
+                    </div>
+                }
+            </section>
+            
+            <section>
+              <h2 className={`${currentTheme.sectionTitle} pb-2 mb-4`}>Skills</h2>
+              {theme === 'matrix' ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                   {skills.map((skillCat, index) => (
+                     <div key={index} className="border border-slate-200 rounded-lg overflow-hidden">
+                        <h3 className={`p-2 font-bold ${currentTheme.skillTableHead}`}>{skillCat.category}</h3>
+                        <ul className="p-3 text-sm space-y-1">
+                          {skillCat.skillsList.map((skill, sIndex) => <li key={sIndex} className={currentTheme.bodyText}>{skill}</li>)}
+                        </ul>
+                     </div>
+                   ))}
+                 </div>
+              ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
+                {skills.map((skillCat, index) => (
+                  <div key={index}>
+                    <h3 className={`font-bold ${currentTheme.bodyText} mb-3`}>{skillCat.category}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {skillCat.skillsList.map((skill, sIndex) => (
+                         <span 
+                          key={sIndex} 
+                          className={`${currentTheme.skillTag} text-sm font-medium px-3 py-1 rounded-full whitespace-nowrap`}
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              )}
+            </section>
+
+            <hr/>
+            <section>
+              <h2 className={`${currentTheme.sectionTitle} pb-2 mb-4`}>Work Experience</h2>
+              <div className={`space-y-8 ${theme === 'chronicle' ? `relative border-l-2 pl-8 ${currentTheme.timelineBorder}` : ''}`}>
+                {experience.map((job, index) => (
+                  <div key={index} className="relative">
+                     {theme === 'chronicle' && (
+                      <div className={`absolute -left-[40px] top-1 h-4 w-4 rounded-full border-4 border-white ${currentTheme.timelineDot}`}></div>
+                    )}
+                    <h3 className={currentTheme.jobTitle}>{job.jobTitle}</h3>
+                    <p className={currentTheme.jobMeta}>{job.organization} | {job.location} | {job.startDate} - {job.endDate}</p>
+                    <p className="text-sm text-slate-500 italic my-2">{job.description}</p>
+                    <h4 className={`${currentTheme.highlight} mt-3 mb-1`}>Key Responsibilities:</h4>
+                    <ul className={`list-disc list-inside space-y-1 ${currentTheme.bodyText}`}>
+                      {job.responsibilities.map((resp, rIndex) => <li key={rIndex}>{resp}</li>)}
+                    </ul>
+                     <p className="mt-3"><span className={currentTheme.highlight}>Key Achievement:</span> <span className={currentTheme.bodyText}>{job.achievement}</span></p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        );
+    }
+  };
+
   return (
     <div id="resume-preview" className={`bg-white shadow-xl rounded-lg overflow-hidden ${currentTheme.container}`}>
       {headerSection}
-
-      <div className="px-10 pb-10 space-y-8">
-        <hr/>
-        <section>
-          <h2 className={`${currentTheme.sectionTitle} pb-2 mb-4`}>Professional Summary</h2>
-          <p className={currentTheme.bodyText}>{careerSummary}</p>
-        </section>
-
-        <section>
-          <h2 className={`${currentTheme.sectionTitle} pb-2 mb-4`}>Education</h2>
-          <div className="space-y-3">
-            {education.map((edu, index) => (
-              <div key={index}>
-                <p className={`font-bold ${currentTheme.bodyText}`}>{edu.degree}</p>
-                <p className={currentTheme.jobMeta}>{edu.institution} | {edu.location} | {edu.graduationYear}</p>
-              </div>
-            ))}
-          </div>
-            { (certificationsAndDevelopment.certifications.length > 0 || certificationsAndDevelopment.trainings.length > 0) &&
-                <div className="mt-4">
-                    <h3 className={`font-semibold text-sm ${currentTheme.highlight}`}>Certifications & Development</h3>
-                    <ul className={`list-disc list-inside space-y-1 mt-2 text-sm ${currentTheme.bodyText}`}>
-                        {certificationsAndDevelopment.certifications.map((cert, index) => (
-                            <li key={`cert-${index}`}>{cert.name}, {cert.issuingBody} ({cert.date})</li>
-                        ))}
-                        {certificationsAndDevelopment.trainings.map((train, index) => (
-                            <li key={`train-${index}`}>{train.name}, {train.provider} ({train.year})</li>
-                        ))}
-                    </ul>
-                </div>
-            }
-        </section>
-        
-        <section>
-          <h2 className={`${currentTheme.sectionTitle} pb-2 mb-4`}>Skills</h2>
-          {theme === 'matrix' ? (
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-               {skills.map((skillCat, index) => (
-                 <div key={index} className="border border-slate-200 rounded-lg overflow-hidden">
-                    <h3 className={`p-2 font-bold ${currentTheme.skillTableHead}`}>{skillCat.category}</h3>
-                    <ul className="p-3 text-sm space-y-1">
-                      {skillCat.skillsList.map((skill, sIndex) => <li key={sIndex} className={currentTheme.bodyText}>{skill}</li>)}
-                    </ul>
-                 </div>
-               ))}
-             </div>
-          ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
-            {skills.map((skillCat, index) => (
-              <div key={index}>
-                <h3 className={`font-bold ${currentTheme.bodyText} mb-3`}>{skillCat.category}</h3>
-                <div className="flex flex-wrap gap-2">
-                  {skillCat.skillsList.map((skill, sIndex) => (
-                     <span 
-                      key={sIndex} 
-                      className={`${currentTheme.skillTag} text-sm font-medium px-3 py-1 rounded-full whitespace-nowrap`}
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          )}
-        </section>
-
-        <hr/>
-        <section>
-          <h2 className={`${currentTheme.sectionTitle} pb-2 mb-4`}>Work Experience</h2>
-          <div className={`space-y-8 ${theme === 'chronicle' ? `relative border-l-2 pl-8 ${currentTheme.timelineBorder}` : ''}`}>
-            {experience.map((job, index) => (
-              <div key={index} className="relative">
-                 {theme === 'chronicle' && (
-                  <div className={`absolute -left-[40px] top-1 h-4 w-4 rounded-full border-4 border-white ${currentTheme.timelineDot}`}></div>
-                )}
-                <h3 className={currentTheme.jobTitle}>{job.jobTitle}</h3>
-                <p className={currentTheme.jobMeta}>{job.organization} | {job.location} | {job.startDate} - {job.endDate}</p>
-                <p className="text-sm text-slate-500 italic my-2">{job.description}</p>
-                <h4 className={`${currentTheme.highlight} mt-3 mb-1`}>Key Responsibilities:</h4>
-                <ul className={`list-disc list-inside space-y-1 ${currentTheme.bodyText}`}>
-                  {job.responsibilities.map((resp, rIndex) => <li key={rIndex}>{resp}</li>)}
-                </ul>
-                 <p className="mt-3"><span className={currentTheme.highlight}>Key Achievement:</span> <span className={currentTheme.bodyText}>{job.achievement}</span></p>
-              </div>
-            ))}
-          </div>
-        </section>
+      <div className="px-10 pb-10">
+        {renderContent()}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { AIResponse, ScoreBreakdown, QuantificationSuggestion, UserProfile } from '../types';
-import ResumePreview, { type Theme } from './ResumePreview';
+import ResumePreview, { type Theme, type DocumentType } from './ResumePreview';
 import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
@@ -125,9 +125,10 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [documentType, setDocumentType] = useState<DocumentType>('resume');
   const [activeResume, setActiveResume] = useState<UserProfile>(response.tailoredResume);
 
-  const { evaluation, headlineSuggestions } = response;
+  const { evaluation, headlineSuggestions, coverLetter, kscResponses } = response;
   const overallScore = evaluation.overallScore;
   const scoreBreakdown: ScoreBreakdown = evaluation.scoreBreakdown;
   const circumference = 2 * Math.PI * 52; // For the SVG gauge
@@ -139,7 +140,7 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
   const handleDownloadPdf = async () => {
     const resumeElement = document.getElementById('resume-preview');
     if (!resumeElement) {
-        setError("Resume preview could not be found for PDF generation.");
+        setError("Document preview could not be found for PDF generation.");
         return;
     }
     setError(null);
@@ -151,7 +152,8 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${activeResume.fullName.replace(' ', '_')}_Resume.pdf`);
+      const fileName = documentType === 'resume' ? 'Resume' : documentType === 'coverLetter' ? 'Cover_Letter' : 'KSC_Responses';
+      pdf.save(`${activeResume.fullName.replace(' ', '_')}_${fileName}.pdf`);
     } catch (error) {
       console.error('[ResultsStep] PDF generation error:', error);
       setError("Failed to generate PDF. Your browser might be blocking the download or the document is too large.");
@@ -161,7 +163,15 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
   };
 
   const handleCopyToClipboard = () => {
-    const textToCopy = resumeToText(activeResume);
+    let textToCopy = "";
+    if (documentType === 'resume') {
+        textToCopy = resumeToText(activeResume);
+    } else if (documentType === 'coverLetter') {
+        textToCopy = coverLetter;
+    } else {
+        textToCopy = kscResponses.map(k => `${k.criteria}\n\n${k.response}`).join('\n\n---\n\n');
+    }
+
     navigator.clipboard.writeText(textToCopy).then(() => {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2500); 
@@ -304,7 +314,21 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
 
         <div className="lg:col-span-2">
             <div className="card p-4 mb-6">
-              <h3 className="text-lg font-semibold text-center mb-3" style={{ color: 'var(--on-surface-color)' }}>Choose a Theme</h3>
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 border-b border-outline-color pb-4">
+                <div className="flex bg-surface-bright-color p-1 rounded-xl border border-outline-color">
+                  {(['resume', 'coverLetter', 'ksc'] as DocumentType[]).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setDocumentType(type)}
+                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${documentType === type ? 'bg-primary-color text-on-primary-color shadow-lg' : 'text-on-surface-variant-color hover:text-on-surface-color'}`}
+                    >
+                      {type === 'resume' ? 'Resume' : type === 'coverLetter' ? 'Cover Letter' : 'KSC Responses'}
+                    </button>
+                  ))}
+                </div>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--on-surface-color)' }}>Theme Customization</h3>
+              </div>
+              
               <div className="flex justify-center gap-2 flex-wrap">
                 {themeOptions.map((t) => (
                   <button
@@ -325,7 +349,7 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ response, onStartOver, initia
                 ))}
               </div>
             </div>
-            <ResumePreview resumeData={activeResume} theme={theme} />
+            <ResumePreview resumeData={activeResume} theme={theme} documentType={documentType} coverLetter={coverLetter} kscResponses={kscResponses} />
         </div>
       </div>
     </div>

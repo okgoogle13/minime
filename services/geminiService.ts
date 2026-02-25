@@ -125,6 +125,15 @@ const UserProfileSchema = { type: Type.OBJECT, properties: { fullName: { type: T
 const ScoreBreakdownSchema = { type: Type.OBJECT, properties: { hardSkillsMatch: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, analysis: { type: Type.STRING } }, required: ['score', 'analysis'] }, softSkillsAndVerbsMatch: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, analysis: { type: Type.STRING } }, required: ['score', 'analysis'] }, quantifiableAchievements: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, analysis: { type: Type.STRING } }, required: ['score', 'analysis'] }, atsReadabilityAndFormatting: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, analysis: { type: Type.STRING } }, required: ['score', 'analysis'] } }, required: ['hardSkillsMatch', 'softSkillsAndVerbsMatch', 'quantifiableAchievements', 'atsReadabilityAndFormatting'] };
 const QuantificationSuggestionSchema = { type: Type.OBJECT, properties: { originalText: { type: Type.STRING }, suggestedRewrite: { type: Type.STRING } }, required: ['originalText', 'suggestedRewrite']};
 const EvaluationSchema = { type: Type.OBJECT, properties: { overallScore: { type: Type.INTEGER, description: "A score from 0 to 100." }, overallAnalysis: { type: Type.STRING }, scoreBreakdown: ScoreBreakdownSchema, actionableFeedback: { type: Type.ARRAY, items: { type: Type.STRING } }, quantificationSuggestions: { type: Type.ARRAY, items: QuantificationSuggestionSchema, description: "Suggest improvements for experience descriptions to be more results-oriented. Use brackets like [Managed a team] to highlight changes." } }, required: ['overallScore', 'overallAnalysis', 'scoreBreakdown', 'actionableFeedback'] };
+const KSCResponseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    criteria: { type: Type.STRING, description: "The specific selection criteria from the job description." },
+    response: { type: Type.STRING, description: "A tailored response demonstrating how the candidate meets this criteria using the STAR method." }
+  },
+  required: ['criteria', 'response']
+};
+
 const AIResponseSchema = { 
   type: Type.OBJECT, 
   properties: { 
@@ -134,9 +143,15 @@ const AIResponseSchema = {
       type: Type.ARRAY,
       items: { type: Type.STRING },
       description: "Generate 3 alternative professional resume headlines. Rules: 1. SHORT: One line max. 2. SPECIFIC: Mention role/focus/achievement. 3. IMPACTFUL: Use total years of experience and top skills from career summary. 4. KEYWORDS: Align with JD if provided."
+    },
+    coverLetter: { type: Type.STRING, description: "A highly tailored, professional cover letter (approx 300-400 words) addressed to the hiring manager." },
+    kscResponses: {
+      type: Type.ARRAY,
+      items: KSCResponseSchema,
+      description: "Generate tailored responses for the top 3-5 key selection criteria identified in the job analysis."
     }
   }, 
-  required: ['tailoredResume', 'evaluation', 'headlineSuggestions'] 
+  required: ['tailoredResume', 'evaluation', 'headlineSuggestions', 'coverLetter', 'kscResponses'] 
 };
 
 export const callGenerateResumeFunction = async (jobAnalysis: JobAnalysis, userProfile: UserProfile): Promise<AIResponse> => {
@@ -174,6 +189,17 @@ export const callGenerateResumeFunction = async (jobAnalysis: JobAnalysis, userP
             -   BE SPECIFIC: Calculate the total years of experience from the work history. Use terms from the Career Summary.
             -   USE KEYWORDS: Include job titles and skills from the JD to improve ATS visibility.
             -   Example: "Senior Cloud Architect | 12+ Years Exp | AWS & Kubernetes Specialist"
+
+    4.  **Cover Letter:**
+        -   Write a compelling, one-page cover letter.
+        -   Address it to "Hiring Manager" if no name is provided.
+        -   Connect the user's specific achievements to the company's niche and values.
+        -   Keep it professional, enthusiastic, and concise.
+
+    5.  **Key Selection Criteria (KSC):**
+        -   Identify the top 3-5 most critical selection criteria from the JD.
+        -   Write a detailed response for each using the STAR (Situation, Task, Action, Result) method.
+        -   Draw from the user's experience to provide concrete evidence.
 
     Your final output MUST be a single, valid JSON object that strictly adheres to the provided schema. Do not include any text or formatting outside of the JSON object.
   `;
@@ -301,6 +327,17 @@ export const MOCK_AI_RESPONSE: AIResponse = {
     "Project Manager with 5+ Years Experience in Agile Delivery",
     "Full-Stack Developer Specializing in React & Node.js Architecture",
     "Results-Driven Tech Lead Proven in Delivering Enterprise Solutions"
+  ],
+  coverLetter: "Dear Hiring Manager,\n\nI am writing to express my strong interest in the Project Manager position at Innovate Corp. With over 5 years of experience leading cross-functional teams and delivering high-impact web applications, I am confident that my background in Agile methodologies and full-stack development makes me an ideal candidate for this role.\n\nAt my current role at Innovate Corp, I successfully led a team of 5 developers to deliver a major platform overhaul two weeks ahead of schedule. This project not only improved user engagement by 25% but also demonstrated my ability to manage complex requirements and tight deadlines effectively. My technical foundation in React and Node.js allows me to bridge the gap between technical teams and stakeholders, ensuring that project goals are met with precision.\n\nI am particularly drawn to Innovate Corp's commitment to customer-centric innovation. I look forward to the possibility of discussing how my skills and experience can contribute to your team's continued success.\n\nSincerely,\nJane Doe",
+  kscResponses: [
+    {
+      criteria: "Demonstrated experience in Agile project management.",
+      response: "In my current role as a Project Manager at Innovate Corp, I have consistently applied Agile methodologies to drive project success. For example, when tasked with a major platform overhaul, I implemented daily stand-ups and bi-weekly sprint planning sessions to ensure clear communication and rapid iteration. By maintaining a well-groomed backlog and fostering a collaborative environment, our team was able to identify and resolve potential bottlenecks early, resulting in the project being delivered two weeks ahead of schedule and with a 25% increase in user engagement metrics."
+    },
+    {
+      criteria: "Proficiency in full-stack web development technologies.",
+      response: "My technical expertise spans the entire web development stack, with a particular focus on React and Node.js. During my tenure at Tech Solutions Inc., I was responsible for building and maintaining RESTful APIs and developing responsive user interfaces. One significant achievement was optimizing our PostgreSQL database queries, which reduced page load times by 30%. This technical depth allows me to not only manage developers effectively but also contribute directly to architectural decisions and code reviews."
+    }
   ],
   evaluation: {
     overallScore: 88,

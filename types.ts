@@ -105,8 +105,15 @@ export interface Evaluation {
   quantificationSuggestions?: QuantificationSuggestion[];
 }
 
+export interface KSCResponse {
+  criteria: string;
+  response: string;
+}
+
 export interface AIResponse {
   tailoredResume: UserProfile;
   evaluation: Evaluation;
   headlineSuggestions: string[];
+  coverLetter: string;
+  kscResponses: KSCResponse[];
 }
